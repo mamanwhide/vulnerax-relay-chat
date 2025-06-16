@@ -28,8 +28,6 @@ ASCII_X = """
              ██╔╝╚██╗ 
             ██╔╝  ╚██╗
             ╚═╝    ╚═╝
-
-//Welc0me To VulneraX Relay Chat [:p]
 \033[0m
 """
 
@@ -386,14 +384,14 @@ def start_client():
 
     clear_screen()
     print(ASCII_X)
-    print("\033[1;36m══════ VULNERAX RELAY CHAT ══════\033[0m")
+    print("\033[1;36m════════ VULNERAX RELAY CHAT ════════\033[0m")
     print(f"\033[1;32mConnected to {ip}:{port}\033[0m")
     print("\033[1;34mAvailable Commands:\033[0m")
     print("  \033[1;37m•\033[0m Send message: <message>")
     print("  \033[1;37m•\033[0m Broadcast: broadcast <message>")
     print("  \033[1;37m•\033[0m Private message: private <username> <message>")
     print("  \033[1;37m•\033[0m Quit: exit")
-    print("\033[1;36m════════════════════════════════\033[0m")
+    print("\033[1;36m════════════════════════════════════\033[0m")
 
     output_text = []
 
@@ -549,14 +547,14 @@ if __name__ == "__main__":
     try:
         clear_screen()
         print(ASCII_X)
-        print("\033[1;36m══════ VULNERAX RELAY CHAT ══════\033[0m")
+        print("\033[1;36m════════ VULNERAX RELAY CHAT ════════\033[0m")
         print("\033[1;33mSecure Multi-Client Communication Platform\033[0m")
         print("\033[1;37mFeatures:\033[0m")
         print("  \033[1;37m•\033[0m Group chat with broadcast messages")
         print("  \033[1;37m•\033[0m Private messaging between users")
         print("  \033[1;37m•\033[0m Password-protected server access")
         print("  \033[1;37m•\033[0m Server or client mode")
-        print("\033[1;36m════════════════════════════════\033[0m")
+        print("\033[1;36m════════════════════════════════════\033[0m")
         choice = input("\033[1;34mRun as (1) Server or (2) Client? \033[0m").strip()
         if choice == '1':
             start_server()
