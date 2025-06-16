@@ -4,30 +4,35 @@ import time
 import sys
 import re
 import netifaces
-import asyncio
+import shutil
+import queue
 from os import system, name
 from prompt_toolkit import Application
-from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.layout.containers import HSplit, Window, Dimension, VSplit
-from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+from prompt_toolkit.layout.controls import FormattedTextControl, BufferControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 from prompt_toolkit.formatted_text import ANSI
+from prompt_toolkit.buffer import Buffer
 
 # ASCII art for "X" in Terminal HUD Style
 ASCII_X = """
 \033[1;36m
         //H3llo.. verr /p/
 
-            ██╗    ██╗
+                     ██╗
+                    ██╔╝
+            ██╗    ██╔╝
             ╚██╗  ██╔╝
              ╚██╗██╔╝ 
               ╚███╔╝  
               ██╔██╗  
              ██╔╝╚██╗ 
             ██╔╝  ╚██╗
-            ╚═╝    ╚═╝
+           ██╔╝    ╚═╝
+          ██╔╝
+          ╚═╝
 \033[0m
 """
 
@@ -134,7 +139,7 @@ def start_server():
     
     def broadcast(message, sender=None):
         timestamp = time.strftime("%H:%M:%S")
-        message = f"[{timestamp}] {message}"
+        message = f"[{timestamp}] {message}"[:500]
         for client, _ in list(clients.items()):
             if client != sender:
                 try:
@@ -146,6 +151,7 @@ def start_server():
     
     def send_private(sender, target_username, message):
         timestamp = time.strftime("%H:%M:%S")
+        message = message[:500]
         for client, username in list(clients.items()):
             if username == target_username:
                 try:
@@ -219,6 +225,8 @@ def start_server():
                         except ValueError as e:
                             print(f"\033[1;31m[SERVER] Invalid private message format from {username}: {e}\033[0m")
                             continue
+                    elif header == "WHO":
+                        client.send(f"[{time.strftime('%H:%M:%S')}] \033[1;33mOnline users: {', '.join(clients.values())}\033[0m\n".encode('utf-8'))
                     else:
                         broadcast(f"{username}: {header}", client)
                 except socket.error as e:
@@ -386,25 +394,54 @@ def start_client():
     print(ASCII_X)
     print("\033[1;36m════════ VULNERAX RELAY CHAT ════════\033[0m")
     print(f"\033[1;32mConnected to {ip}:{port}\033[0m")
-    print("\033[1;34mAvailable Commands:\033[0m")
-    print("  \033[1;37m•\033[0m Send message: <message>")
-    print("  \033[1;37m•\033[0m Broadcast: broadcast <message>")
-    print("  \033[1;37m•\033[0m Private message: private <username> <message>")
-    print("  \033[1;37m•\033[0m Quit: exit")
-    print("\033[1;36m════════════════════════════════════\033[0m")
 
-    output_text = []
+    messages = []
+    message_queue = queue.Queue()
+    stop_event = threading.Event()
+    max_memory_messages = 100
+    is_connected = True
+    auto_help = True
 
+    def get_help_message():
+        return "\n".join([
+            "\033[1;34mAvailable Commands:\033[0m",
+            "  \033[1;37m•\033[0m Send message: <message>",
+            "  \033[1;37m•\033[0m Broadcast: broadcast <message>",
+            "  \033[1;37m•\033[0m Private message: private <username> <message>",
+            "  \033[1;37m•\033[0m Clear screen: clear",
+            "  \033[1;37m•\033[0m Show commands: help (or h)",
+            "  \033[1;37m•\033[0m List online users: who",
+            "  \033[1;37m•\033[0m Configure: config <setting> <value> (e.g., config autohelp off)",
+            "  \033[1;37m•\033[0m Quit: exit (or q)",
+            "\033[1;36m════════════════════════════════════\033[0m"
+        ])
+
+    def get_max_display_messages():
+        terminal_size = shutil.get_terminal_size()
+        return max(5, terminal_size.lines - 1)
+
+    def get_output_text():
+        max_display = get_max_display_messages()
+        display_messages = messages[-max_display:]
+        return ANSI("\n".join(display_messages))
+
+    def get_prompt_text():
+        status = "" if is_connected else "\033[1;31m[Disconnected]\033[0m"
+        return ANSI(f"\033[1;32m{username}@VulneraX:{status}~$ \033[0m")
+
+    output_control = FormattedTextControl(get_output_text)
     output_window = Window(
-        FormattedTextControl(lambda: ANSI(''.join(output_text))),
+        content=output_control,
         wrap_lines=True,
-        height=Dimension(max=sys.maxsize),
+        height=Dimension(min=1, preferred=len(messages), max=get_max_display_messages()),
         width=Dimension(max=80)
     )
     input_buffer = Buffer()
+    prompt_control = FormattedTextControl(get_prompt_text)
     prompt_window = Window(
-        FormattedTextControl(ANSI(f"\033[1;32m{username}@VulneraX:~$ \033[0m")),
-        width=Dimension.exact(len(f"{username}@VulneraX:~$ ") + 2),
+        content=prompt_control,
+        width=Dimension.exact(len(f"{username}@VulneraX:~$ ") + 12),  # Ruang untuk [Disconnected]
+        wrap_lines=True,
         height=1
     )
     input_control_window = Window(
@@ -437,25 +474,67 @@ def start_client():
 
     @bindings.add('enter')
     def _(event):
+        nonlocal is_connected, auto_help
         message = input_buffer.text.strip()
         if message:
-            if message.lower() == 'exit':
+            if message.lower() in ['exit', 'q']:
+                stop_event.set()
                 app.exit()
                 try:
                     client.close()
                 except:
                     pass
                 sys.exit(0)
+            if message.lower() in ['help', 'h']:
+                message_queue.put(get_help_message())
+                input_buffer.text = ""
+                app.invalidate()
+                return
+            if message.lower() == 'clear':
+                messages.clear()
+                if auto_help:
+                    message_queue.put(get_help_message())
+                input_buffer.text = ""
+                app.invalidate()
+                return
+            if message.lower() == 'who':
+                try:
+                    client.send("WHO\n".encode('utf-8'))
+                    input_buffer.text = ""
+                    app.invalidate()
+                    return
+                except socket.error:
+                    message_queue.put("\033[1;31mCannot send: Disconnected\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                    is_connected = False
+                    app.invalidate()
+                    return
+            if message.startswith("config "):
+                parts = message.split(" ", 2)
+                if len(parts) == 3 and parts[1].lower() == "autohelp":
+                    if parts[2].lower() == "off":
+                        auto_help = False
+                        message_queue.put("\033[1;32mAuto-help disabled\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                    elif parts[2].lower() == "on":
+                        auto_help = True
+                        message_queue.put("\033[1;32mAuto-help enabled\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                    else:
+                        message_queue.put("\033[1;31mInvalid value: Use 'on' or 'off'\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                    input_buffer.text = ""
+                    app.invalidate()
+                    return
+            if message.startswith("private "):
+                parts = message.split(" ", 2)
+                if len(parts) < 3 or not parts[1].strip() or not parts[2].strip():
+                    message_queue.put("\033[1;31mUsage: private <username> <message>\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                    input_buffer.text = ""
+                    app.invalidate()
+                    return
             try:
                 if message.startswith("private "):
-                    parts = message.split(" ", 2)
-                    if len(parts) < 3:
-                        output_text.append("\n\033[1;31mUsage: private <username> <message>\033[0m\n\033[1;36m════════════════════════════════\033[0m")
-                        input_buffer.text = ""
-                        app.invalidate()
-                        return
-                    _, target_username, private_message = parts
+                    _, target_username, private_message = message.split(" ", 2)
                     client.send(f"PRIVATE:{target_username}:{private_message}\n".encode('utf-8'))
+                    message_queue.put(f"\033[1;35m[PRIVATE to {target_username}] {private_message}\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                    print("\a")  # Nada untuk pesan privat
                 else:
                     if message.startswith("broadcast "):
                         message = message.split(" ", 1)[1]
@@ -463,20 +542,19 @@ def start_client():
                 input_buffer.text = ""
                 app.invalidate()
             except socket.error as e:
-                output_text.append(f"\n\033[1;31mError sending message: {e}\033[0m\n\033[1;36m════════════════════════════════\033[0m")
-                app.exit()
-            except Exception as e:
-                output_text.append(f"\n\033[1;31mUnexpected error: {e}\033[0m\n\033[1;36m════════════════════════════════\033[0m")
-                app.exit()
+                message_queue.put(f"\033[1;31mError sending message: {e}\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                is_connected = False
+                app.invalidate()
 
     @bindings.add('c-c')
     def _(event):
+        stop_event.set()
         app.exit()
         try:
             client.close()
         except:
             pass
-        output_text.append("\n\033[1;31mExiting VulneraX Relay Chat...\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+        message_queue.put("\033[1;31mExiting VulneraX Relay Chat...\033[0m\n\033[1;36m════════════════════════════════\033[0m")
         sys.exit(0)
 
     try:
@@ -484,8 +562,12 @@ def start_client():
             layout=layout,
             key_bindings=bindings,
             style=style,
-            full_screen=True
+            full_screen=True,
+            refresh_interval=0.5
         )
+        print("\033[1;34m[CLIENT] UI initialized successfully\033[0m")
+        # Tampilkan help otomatis setelah koneksi
+        message_queue.put(get_help_message())
     except Exception as e:
         print(f"\033[1;31mFailed to initialize application: {e}\033[0m")
         client.close()
@@ -493,51 +575,113 @@ def start_client():
 
     app.layout.focus(input_control_window)
 
-    async def receive():
-        loop = asyncio.get_event_loop()
-        buffer = ""
-        while True:
+    def reconnect():
+        nonlocal client, is_connected
+        attempts = 0
+        max_reconnect_attempts = 3
+        while attempts < max_reconnect_attempts and not stop_event.is_set():
             try:
-                data = client.recv(1024).decode('utf-8')
+                client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                client.settimeout(5)
+                client.connect((ip, port))
+                client.settimeout(None)
+                client.send(f"{password}\n".encode('utf-8'))
+                auth_response = receive_until_newline(client)
+                if auth_response == "AUTH_SUCCESS":
+                    client.send(f"{username}\n".encode('utf-8'))
+                    message_queue.put("\033[1;32mReconnected to server\033[0m\n\033[1;36m════════════════════════════════════\033[0m")
+                    is_connected = True
+                    app.invalidate()
+                    return True
+                client.close()
+            except socket.error:
+                attempts += 1
+                time.sleep(2)
+            finally:
+                if client:
+                    client.close()
+        message_queue.put("\033[1;31mFailed to reconnect after 3 attempts\033[0m\n\033[1;36m════════════════════════════════════\033[0m")
+        is_connected = False
+        app.invalidate()
+        return False
+
+    def receive():
+        buffer = ""
+        while not stop_event.is_set():
+            try:
+                data = client.recv(1024)
                 if not data:
-                    await loop.run_in_executor(None, lambda: output_text.append("\n\033[1;31mDisconnected from server\033[0m\n\033[1;36m════════════════════════════════\033[0m"))
-                    await loop.run_in_executor(None, app.invalidate)
+                    message_queue.put("\033[1;31mDisconnected from server\033[0m\n\033[1;36m════════════════════════════════════\033[0m")
+                    nonlocal is_connected
+                    is_connected = False
+                    if reconnect():
+                        continue
                     break
-                buffer += data
+                buffer += data.decode('utf-8')
                 while '\n' in buffer:
                     message, _, buffer = buffer.partition('\n')
-                    message = message.strip()
+                    message = message.strip()[:500]  # Batasi panjang pesan
                     if message:
-                        # Debug: Log received data
-                        # print(f"\033[1;34m[CLIENT] Received: {repr(message)}\033[0m")
-                        await loop.run_in_executor(None, lambda: output_text.append(f"\n\033[0;37m{message}\033[0m\n\033[1;36m════════════════════════════════\033[0m"))
-                        await loop.run_in_executor(None, app.invalidate)
+                        color = "\033[0;37m"
+                        if "lala" in message:
+                            color = "\033[1;34m"
+                        elif "hasrul" in message:
+                            color = "\033[1;32m"
+                        if "[PRIVATE" in message:
+                            print("\a")  # Nada untuk pesan privat
+                        message_queue.put(f"{color}{message}\033[0m\n\033[1;36m════════════════════════════════════\033[0m")
+                        app.invalidate()  # Pastikan UI diperbarui
+            except ConnectionResetError:
+                message_queue.put("\033[1;31mServer connection reset\033[0m\n\033[1;36m════════════════════════════════════\033[0m")
+                is_connected = False
+                if reconnect():
+                    continue
+                break
+            except BrokenPipeError:
+                message_queue.put("\033[1;31mBroken pipe to server\033[0m\n\033[1;36m════════════════════════════════════\033[0m")
+                is_connected = False
+                if reconnect():
+                    continue
+                break
             except socket.error as e:
-                await loop.run_in_executor(None, lambda: output_text.append(f"\n\033[1;31mDisconnected from server: {e}\033[0m\n\033[1;36m════════════════════════════════\033[0m"))
-                await loop.run_in_executor(None, app.invalidate)
+                message_queue.put(f"\033[1;31mSocket error: {e}\033[0m\n\033[1;36m════════════════════════════════════\033[0m")
+                is_connected = False
+                if reconnect():
+                    continue
                 break
             except UnicodeDecodeError as e:
-                await loop.run_in_executor(None, lambda: output_text.append(f"\n\033[1;31mDecoding error: {e}\033[0m\n\033[1;36m════════════════════════════════\033[0m"))
-                await loop.run_in_executor(None, app.invalidate)
+                message_queue.put(f"\033[1;31mDecoding error: {e}\033[0m\n\033[1;36m════════════════════════════════════\033[0m")
         try:
             client.close()
         except:
             pass
-        await loop.run_in_executor(None, app.exit)
+        app.exit()
 
-    def start_receive_thread():
-        try:
-            asyncio.run(receive())
-        except Exception as e:
-            print(f"\033[1;31mReceive thread error: {e}\033[0m")
+    def update_ui():
+        while not stop_event.is_set():
+            try:
+                message = message_queue.get_nowait()
+                messages.append(message)
+                if len(messages) > max_memory_messages:
+                    messages.pop(0)
+                # Perbarui tinggi output_window secara dinamis
+                output_window.height = Dimension(min=1, preferred=len(messages), max=get_max_display_messages())
+                app.invalidate()
+            except queue.Empty:
+                time.sleep(0.02)  # Kurangi penggunaan CPU
+            except Exception as e:
+                message_queue.put(f"\033[1;31mUI update error: {e}\033[0m\n\033[1;36m════════════════════════════════════\033[0m")
 
-    receive_thread = threading.Thread(target=start_receive_thread, daemon=True)
+    receive_thread = threading.Thread(target=receive, daemon=True)
     receive_thread.start()
+    ui_thread = threading.Thread(target=update_ui, daemon=True)
+    ui_thread.start()
 
     try:
         app.run()
     except Exception as e:
         print(f"\033[1;31mApplication error: {e}\033[0m")
+        stop_event.set()
         try:
             client.close()
         except:

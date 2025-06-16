@@ -5,14 +5,30 @@
 **VulneraX Relay Chat**, aplikasi obrolan intern berbasis terminal yang aman dan mendukung komunikasi multi-klien. Dibangun dengan Python, aplikasi ini menawarkan pengalaman obrolan grup dan pribadi.
 
 ```
-██╗    ██╗
-╚██╗  ██╔╝
- ╚██╗██╔╝ 
-  ╚███╔╝  
-  ██╔██╗  
- ██╔╝╚██╗ 
-██╔╝  ╚██╗
-╚═╝    ╚═╝
+        //H3llo.. verr /p/
+
+                     ██╗
+                    ██╔╝
+            ██╗    ██╔╝
+            ╚██╗  ██╔╝
+             ╚██╗██╔╝ 
+              ╚███╔╝  
+              ██╔██╗  
+             ██╔╝╚██╗ 
+            ██╔╝  ╚██╗
+           ██╔╝    ╚═╝
+          ██╔╝
+          ╚═╝
+
+════════ VULNERAX RELAY CHAT ════════
+Secure Multi-Client Communication Platform
+Features:
+  • Group chat with broadcast messages
+  • Private messaging between users
+  • Password-protected server access
+  • Server or client mode
+════════════════════════════════════
+
 ```
 
 ## Deskripsi Proyek
