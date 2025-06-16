@@ -58,9 +58,8 @@ Untuk menjalankan VulneraX Relay Chat, pastikan Anda memiliki:
 
 2. **Instal Dependensi**:
    ```bash
-   pip3 install netifaces
-   pipx install netifaces
-   sudo apt install python3-netifaces
+   sudo apt install python3-netifaces or pipx install netifaces
+   pix install prompt_toolkit
    ```
 
 3. **Jalankan Aplikasi**:

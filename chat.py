@@ -4,32 +4,42 @@ import time
 import sys
 import re
 import netifaces
+import asyncio
 from os import system, name
+from prompt_toolkit import Application
+from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.layout.containers import HSplit, Window, Dimension, VSplit
+from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+from prompt_toolkit.layout.layout import Layout
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.styles import Style
+from prompt_toolkit.formatted_text import ANSI
 
 # ASCII art for "X" in Terminal HUD Style
 ASCII_X = """
 \033[1;36m
-██╗    ██╗
-╚██╗  ██╔╝
- ╚██╗██╔╝ 
-  ╚███╔╝  
-  ██╔██╗  
- ██╔╝╚██╗ 
-██╔╝  ╚██╗
-╚═╝    ╚═╝
+        //H3llo.. verr /p/
+
+            ██╗    ██╗
+            ╚██╗  ██╔╝
+             ╚██╗██╔╝ 
+              ╚███╔╝  
+              ██╔██╗  
+             ██╔╝╚██╗ 
+            ██╔╝  ╚██╗
+            ╚═╝    ╚═╝
+
+//Welc0me To VulneraX Relay Chat [:p]
 \033[0m
 """
 
-# Clear terminal screen
 def clear_screen():
     system('cls' if name == 'nt' else 'clear')
 
-# Validate IP address
 def is_valid_ip(ip):
     pattern = re.compile(r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
     return ip == "0.0.0.0" or bool(pattern.match(ip))
 
-# Validate port
 def is_valid_port(port_str):
     try:
         port = int(port_str)
@@ -37,7 +47,6 @@ def is_valid_port(port_str):
     except ValueError:
         return False
 
-# Get non-loopback IP address
 def get_local_ip():
     try:
         for iface in netifaces.interfaces():
@@ -131,7 +140,7 @@ def start_server():
         for client, _ in list(clients.items()):
             if client != sender:
                 try:
-                    client.send(message.encode('utf-8'))
+                    client.send(f"{message}\n".encode('utf-8'))
                 except socket.error as e:
                     print(f"\033[1;31m[SERVER] Failed to broadcast to {clients[client]}: {e}\033[0m")
                     client.close()
@@ -142,8 +151,8 @@ def start_server():
         for client, username in list(clients.items()):
             if username == target_username:
                 try:
-                    client.send(f"[{timestamp}] \033[1;35m[PRIVATE from {clients[sender]}] {message}\033[0m".encode('utf-8'))
-                    sender.send(f"[{timestamp}] \033[1;35m[PRIVATE to {target_username}] {message}\033[0m".encode('utf-8'))
+                    client.send(f"[{timestamp}] \033[1;35m[PRIVATE from {clients[sender]}] {message}\033[0m\n".encode('utf-8'))
+                    sender.send(f"[{timestamp}] \033[1;35m[PRIVATE to {target_username}] {message}\033[0m\n".encode('utf-8'))
                     print(f"\033[1;34m[SERVER] Private message from {clients[sender]} to {target_username}: {message}\033[0m")
                     return True
                 except socket.error as e:
@@ -151,7 +160,7 @@ def start_server():
                     client.close()
                     clients.pop(client, None)
         try:
-            sender.send(f"[{timestamp}] \033[1;31mUser {target_username} not found\033[0m".encode('utf-8'))
+            sender.send(f"[{timestamp}] \033[1;31mUser {target_username} not found\033[0m\n".encode('utf-8'))
             print(f"\033[1;34m[SERVER] User {target_username} not found for {clients[sender]}\033[0m")
         except socket.error as e:
             print(f"\033[1;31m[SERVER] Failed to notify {clients[sender]}: {e}\033[0m")
@@ -200,7 +209,7 @@ def start_server():
             
             while True:
                 try:
-                    header = client.recv(1024).decode('utf-8')
+                    header = receive_until_newline(client)
                     if not header:
                         print(f"\033[1;31m[SERVER] Client {username} disconnected (no data)\033[0m")
                         break
@@ -208,7 +217,7 @@ def start_server():
                     if header.startswith("PRIVATE:"):
                         try:
                             _, target_username, message = header.split(":", 2)
-                            send_private(client, target_username, message)
+                            send_private(client, target_username, message.strip())
                         except ValueError as e:
                             print(f"\033[1;31m[SERVER] Invalid private message format from {username}: {e}\033[0m")
                             continue
@@ -258,7 +267,6 @@ def start_server():
                 pass
         server.close()
 
-# Client
 def start_client():
     print("\033[1;34mSearching for server...\033[0m")
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -386,92 +394,156 @@ def start_client():
     print("  \033[1;37m•\033[0m Private message: private <username> <message>")
     print("  \033[1;37m•\033[0m Quit: exit")
     print("\033[1;36m════════════════════════════════\033[0m")
-    
-    running = True
-    
-    def receive():
-        nonlocal running
-        while running:
-            try:
-                data = client.recv(1024).decode('utf-8')
-                if not data:
-                    print("\n\033[1;31mDisconnected from server\033[0m")
-                    print("\033[1;36m════════════════════════════════\033[0m")
-                    break
-                print(f"\n\033[0;37m{data}\033[0m")
-                print("\033[1;36m════════════════════════════════\033[0m")
-                print(f"\033[1;32m{username}@VulneraX:~$ \033[0m", end="", flush=True)
-            except socket.error as e:
-                if running:
-                    print(f"\n\033[1;31mDisconnected from server: {e}\033[0m")
-                    print("\033[1;36m════════════════════════════════\033[0m")
-                break
-            except UnicodeDecodeError as e:
-                print(f"\n\033[1;31mDecoding error: {e}\033[0m")
-                print("\033[1;36m════════════════════════════════\033[0m")
-                break
-        try:
-            client.close()
-        except:
-            pass
-    
-    receive_thread = threading.Thread(target=receive)
-    receive_thread.start()
-    
-    try:
-        while True:
-            print(f"\033[1;32m{username}@VulneraX:~$ \033[0m", end="", flush=True)
-            message = input()
+
+    output_text = []
+
+    output_window = Window(
+        FormattedTextControl(lambda: ANSI(''.join(output_text))),
+        wrap_lines=True,
+        height=Dimension(max=sys.maxsize),
+        width=Dimension(max=80)
+    )
+    input_buffer = Buffer()
+    prompt_window = Window(
+        FormattedTextControl(ANSI(f"\033[1;32m{username}@VulneraX:~$ \033[0m")),
+        width=Dimension.exact(len(f"{username}@VulneraX:~$ ") + 2),
+        height=1
+    )
+    input_control_window = Window(
+        BufferControl(buffer=input_buffer),
+        height=1,
+        width=Dimension(max=80)
+    )
+    input_container = VSplit([
+        prompt_window,
+        input_control_window
+    ])
+    separator_window = Window(
+        height=1,
+        char='═',
+        style='fg:#00aaaa',
+        width=Dimension.exact(32)
+    )
+    root_container = HSplit([
+        output_window,
+        separator_window,
+        input_container
+    ])
+    layout = Layout(root_container)
+
+    style = Style.from_dict({
+        '': '#ffffff',
+    })
+
+    bindings = KeyBindings()
+
+    @bindings.add('enter')
+    def _(event):
+        message = input_buffer.text.strip()
+        if message:
             if message.lower() == 'exit':
-                running = False
+                app.exit()
                 try:
                     client.close()
                 except:
                     pass
-                print("\n\033[1;31mExiting VulneraX Relay Chat...\033[0m")
-                print("\033[1;36m════════════════════════════════\033[0m")
                 sys.exit(0)
             try:
                 if message.startswith("private "):
                     parts = message.split(" ", 2)
                     if len(parts) < 3:
-                        print("\n\033[1;31mUsage: private <username> <message>\033[0m")
-                        print("\033[1;36m════════════════════════════════\033[0m")
-                        continue
+                        output_text.append("\n\033[1;31mUsage: private <username> <message>\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                        input_buffer.text = ""
+                        app.invalidate()
+                        return
                     _, target_username, private_message = parts
-                    client.send(f"PRIVATE:{target_username}:{private_message}".encode('utf-8'))
+                    client.send(f"PRIVATE:{target_username}:{private_message}\n".encode('utf-8'))
                 else:
                     if message.startswith("broadcast "):
                         message = message.split(" ", 1)[1]
-                    client.send(message.encode('utf-8'))
-                print("\033[1;36m════════════════════════════════\033[0m")
+                    client.send(f"{message}\n".encode('utf-8'))
+                input_buffer.text = ""
+                app.invalidate()
             except socket.error as e:
-                running = False
-                print(f"\n\033[1;31mError sending message: {e}\033[0m")
-                print("\033[1;36m════════════════════════════════\033[0m")
-                break
+                output_text.append(f"\n\033[1;31mError sending message: {e}\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                app.exit()
             except Exception as e:
-                print(f"\n\033[1;31mUnexpected error: {e}\033[0m")
-                print("\033[1;36m════════════════════════════════\033[0m")
-    except KeyboardInterrupt:
-        running = False
-        print("\n\033[1;31mExiting VulneraX Relay Chat...\033[0m")
-        print("\033[1;36m════════════════════════════════\033[0m")
+                output_text.append(f"\n\033[1;31mUnexpected error: {e}\033[0m\n\033[1;36m════════════════════════════════\033[0m")
+                app.exit()
+
+    @bindings.add('c-c')
+    def _(event):
+        app.exit()
         try:
             client.close()
         except:
             pass
+        output_text.append("\n\033[1;31mExiting VulneraX Relay Chat...\033[0m\n\033[1;36m════════════════════════════════\033[0m")
         sys.exit(0)
-    except Exception as e:
-        running = False
-        print(f"\n\033[1;31mUnexpected error: {e}\033[0m")
-        print("\033[1;36m════════════════════════════════\033[0m")
-    
+
     try:
+        app = Application(
+            layout=layout,
+            key_bindings=bindings,
+            style=style,
+            full_screen=True
+        )
+    except Exception as e:
+        print(f"\033[1;31mFailed to initialize application: {e}\033[0m")
         client.close()
-    except:
-        pass
-    sys.exit(0)
+        return
+
+    app.layout.focus(input_control_window)
+
+    async def receive():
+        loop = asyncio.get_event_loop()
+        buffer = ""
+        while True:
+            try:
+                data = client.recv(1024).decode('utf-8')
+                if not data:
+                    await loop.run_in_executor(None, lambda: output_text.append("\n\033[1;31mDisconnected from server\033[0m\n\033[1;36m════════════════════════════════\033[0m"))
+                    await loop.run_in_executor(None, app.invalidate)
+                    break
+                buffer += data
+                while '\n' in buffer:
+                    message, _, buffer = buffer.partition('\n')
+                    message = message.strip()
+                    if message:
+                        # Debug: Log received data
+                        # print(f"\033[1;34m[CLIENT] Received: {repr(message)}\033[0m")
+                        await loop.run_in_executor(None, lambda: output_text.append(f"\n\033[0;37m{message}\033[0m\n\033[1;36m════════════════════════════════\033[0m"))
+                        await loop.run_in_executor(None, app.invalidate)
+            except socket.error as e:
+                await loop.run_in_executor(None, lambda: output_text.append(f"\n\033[1;31mDisconnected from server: {e}\033[0m\n\033[1;36m════════════════════════════════\033[0m"))
+                await loop.run_in_executor(None, app.invalidate)
+                break
+            except UnicodeDecodeError as e:
+                await loop.run_in_executor(None, lambda: output_text.append(f"\n\033[1;31mDecoding error: {e}\033[0m\n\033[1;36m════════════════════════════════\033[0m"))
+                await loop.run_in_executor(None, app.invalidate)
+        try:
+            client.close()
+        except:
+            pass
+        await loop.run_in_executor(None, app.exit)
+
+    def start_receive_thread():
+        try:
+            asyncio.run(receive())
+        except Exception as e:
+            print(f"\033[1;31mReceive thread error: {e}\033[0m")
+
+    receive_thread = threading.Thread(target=start_receive_thread, daemon=True)
+    receive_thread.start()
+
+    try:
+        app.run()
+    except Exception as e:
+        print(f"\033[1;31mApplication error: {e}\033[0m")
+        try:
+            client.close()
+        except:
+            pass
 
 if __name__ == "__main__":
     try:
