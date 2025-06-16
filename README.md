@@ -44,7 +44,6 @@ Proyek ini cocok untuk pengguna yang ingin menjelajahi komunikasi jaringan, pemr
 - **Broadcast Pesan**: Kirim pesan ke semua klien secara serentak dengan perintah `broadcast`.
 - **Autentikasi Kata Sandi**: Server dilindungi dengan kata sandi, dengan batas tiga kali percobaan.
 - **Penemuan Server Otomatis**: Menggunakan UDP broadcast untuk mendeteksi server di jaringan lokal.
-- **Antarmuka Estetis**: Desain Terminal HUD dengan ASCII art "X", warna ANSI, dan garis pemisah elegan.
 - **Perintah Exit**: Keluar dari aplikasi klien dengan rapi menggunakan perintah `exit`.
 - **Pembersihan Terminal**: Mendukung pembersihan layar untuk pengalaman pengguna yang lebih baik.
 
@@ -66,7 +65,7 @@ Untuk menjalankan VulneraX Relay Chat, pastikan Anda memiliki:
 
 ## Instalasi
 
-1. **Klon Repositori**:
+1. **Clone Repositori**:
    ```bash
    git clone https://github.com/mamanwhide/vulnerax-relay-chat.git
    cd vulnerax-relay-chat
@@ -80,7 +79,7 @@ Untuk menjalankan VulneraX Relay Chat, pastikan Anda memiliki:
 
 3. **Jalankan Aplikasi**:
    ```bash
-   python chat.py
+   python3 chat.py
    ```
 
 ## Cara Penggunaan
@@ -89,18 +88,31 @@ Untuk menjalankan VulneraX Relay Chat, pastikan Anda memiliki:
    - Jalankan `python chat.py`.
    - Anda akan melihat antarmuka awal dengan ASCII art "X":
      ```
-     ██╗    ██╗
-     ╚██╗  ██╔╝
-      ╚██╗██╔╝ 
-       ╚███╔╝  
-       ██╔██╗  
-      ██╔╝╚██╗ 
-     ██╔╝  ╚██╗
-     ╚═╝    ╚═╝
+        //H3llo.. verr /p/
 
-     ══════ VULNERAX RELAY CHAT ══════
+                     ██╗
+                    ██╔╝
+            ██╗    ██╔╝
+            ╚██╗  ██╔╝
+             ╚██╗██╔╝ 
+              ╚███╔╝  
+              ██╔██╗  
+             ██╔╝╚██╗ 
+            ██╔╝  ╚██╗
+           ██╔╝    ╚═╝
+          ██╔╝
+          ╚═╝
+
+
+     ════════ VULNERAX RELAY CHAT ════════
      Secure Multi-Client Communication Platform
-     ...
+     Features:
+       • Group chat with broadcast messages
+       • Private messaging between users
+       • Password-protected server access
+       • Server or client mode
+     ════════════════════════════════════
+
      Run as (1) Server or (2) Client?
      ```
    - Pilih `1` untuk menjalankan sebagai server atau `2` sebagai klien.
@@ -193,4 +205,3 @@ Jika Anda memiliki pertanyaan atau saran, silakan hubungi:
 - **Email**: [maman@vulnerax.com](mailto:maman@vulnerax.com)
 - **GitHub Issues**: Buka isu baru di repositori ini.
 
-Terima kasih telah menggunakan VulneraX Relay Chat! 
