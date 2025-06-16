@@ -2,7 +2,7 @@
 
 ![VulneraX Logo](https://vulnerax.id/img/logo.png)
 
-**VulneraX Relay Chat**, aplikasi obrolan berbasis terminal yang aman dan mendukung komunikasi multi-klien. Dibangun dengan Python, aplikasi ini menawarkan pengalaman obrolan grup dan pribadi dengan antarmuka estetis bergaya Terminal HUD.
+**VulneraX Relay Chat**, aplikasi obrolan intern berbasis terminal yang aman dan mendukung komunikasi multi-klien. Dibangun dengan Python, aplikasi ini menawarkan pengalaman obrolan grup dan pribadi dengan antarmuka estetis bergaya Terminal HUD.
 
 ```
 ██╗    ██╗
