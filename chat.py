@@ -139,7 +139,7 @@ def start_server():
     
     def broadcast(message, sender=None):
         timestamp = time.strftime("%H:%M:%S")
-        message = f"[{timestamp}] {message}"[:500]
+        message = f"[{timestamp}] {message}"[:500]  # Batasi panjang pesan
         for client, _ in list(clients.items()):
             if client != sender:
                 try:
@@ -151,7 +151,7 @@ def start_server():
     
     def send_private(sender, target_username, message):
         timestamp = time.strftime("%H:%M:%S")
-        message = message[:500]
+        message = message[:500]  # Batasi panjang pesan
         for client, username in list(clients.items()):
             if username == target_username:
                 try:
@@ -226,7 +226,9 @@ def start_server():
                             print(f"\033[1;31m[SERVER] Invalid private message format from {username}: {e}\033[0m")
                             continue
                     elif header == "WHO":
-                        client.send(f"[{time.strftime('%H:%M:%S')}] \033[1;33mOnline users: {', '.join(clients.values())}\033[0m\n".encode('utf-8'))
+                        client_list = ", ".join(clients.values())
+                        user_count = len(clients)
+                        client.send(f"[{time.strftime('%H:%M:%S')}] \033[1;33mOnline users: {client_list} ({user_count})\033[0m\n".encode('utf-8'))
                     else:
                         broadcast(f"{username}: {header}", client)
                 except socket.error as e:
@@ -400,7 +402,7 @@ def start_client():
     stop_event = threading.Event()
     max_memory_messages = 100
     is_connected = True
-    auto_help = True
+    auto_help = True  # Pertahankan untuk config, meskipun tidak memengaruhi clear
 
     def get_help_message():
         return "\n".join([
@@ -418,7 +420,7 @@ def start_client():
 
     def get_max_display_messages():
         terminal_size = shutil.get_terminal_size()
-        return max(5, terminal_size.lines - 1)
+        return max(5, terminal_size.lines - 1)  # Margin untuk prompt
 
     def get_output_text():
         max_display = get_max_display_messages()
@@ -492,8 +494,6 @@ def start_client():
                 return
             if message.lower() == 'clear':
                 messages.clear()
-                if auto_help:
-                    message_queue.put(get_help_message())
                 input_buffer.text = ""
                 app.invalidate()
                 return
